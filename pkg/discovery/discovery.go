@@ -18,6 +18,7 @@ func ParseContainer(container types.ContainerJSON, hostMountPrefix string) (*app
 		ContainerID: container.ID,
 		PreHook:     labels["restic.hooks.pre-backup"],
 		PostHook:    labels["restic.hooks.post-backup"],
+		Stop:        labels["restic.backup.stop"] == "true" || labels["restic.backup.down"] == "true",
 	}
 
 	pathsStr := labels["restic.backup.paths"]

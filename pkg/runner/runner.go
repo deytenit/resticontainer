@@ -11,6 +11,25 @@ type ResticExecutor func(ctx context.Context, args []string) error
 
 func RunHooksAndBackup(ctx context.Context, client dockerclient.DockerClient, targets []*apptypes.Target, resticArgs []string, execRestic ResticExecutor) error {
 	var executedPreHooks []*apptypes.Target
+	var stoppedContainers []*apptypes.Target
+
+	defer func() {
+		for _, t := range stoppedContainers {
+			if err := client.StartContainer(context.Background(), t.ContainerID); err != nil {
+				fmt.Printf("Warning: failed to start container %s after backup: %v\n", t.ContainerID, err)
+			}
+		}
+
+		for _, t := range executedPreHooks {
+			if t.PostHook != "" {
+				cmd := []string{"sh", "-c", t.PostHook}
+				err := client.ExecCommand(context.Background(), t.ContainerID, cmd)
+				if err != nil {
+					fmt.Printf("Warning: post-hook failed for %s: %v\n", t.ContainerID, err)
+				}
+			}
+		}
+	}()
 
 	// Pre hooks
 	for _, t := range targets {
@@ -24,18 +43,15 @@ func RunHooksAndBackup(ctx context.Context, client dockerclient.DockerClient, ta
 		executedPreHooks = append(executedPreHooks, t)
 	}
 
-	// Make sure post-hooks run for all successfully executed pre-hooks
-	defer func() {
-		for _, t := range executedPreHooks {
-			if t.PostHook != "" {
-				cmd := []string{"sh", "-c", t.PostHook}
-				err := client.ExecCommand(ctx, t.ContainerID, cmd)
-				if err != nil {
-					fmt.Printf("Warning: post-hook failed for %s: %v\n", t.ContainerID, err)
-				}
+	// Stop marked containers
+	for _, t := range targets {
+		if t.Stop {
+			if err := client.StopContainer(ctx, t.ContainerID); err != nil {
+				return fmt.Errorf("failed to stop container %s: %w", t.ContainerID, err)
 			}
+			stoppedContainers = append(stoppedContainers, t)
 		}
-	}()
+	}
 
 	var backupPaths []string
 	for _, t := range targets {

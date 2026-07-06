@@ -15,7 +15,9 @@ type execCall struct {
 }
 
 type mockDockerClient struct {
-	execs []execCall
+	execs  []execCall
+	stops  []string
+	starts []string
 }
 
 func (m *mockDockerClient) ListContainers(ctx context.Context) ([]types.Container, error) {
@@ -28,6 +30,14 @@ func (m *mockDockerClient) ExecCommand(ctx context.Context, containerID string, 
 	m.execs = append(m.execs, execCall{containerID: containerID, cmd: cmd})
 	return nil
 }
+func (m *mockDockerClient) StopContainer(ctx context.Context, id string) error {
+	m.stops = append(m.stops, id)
+	return nil
+}
+func (m *mockDockerClient) StartContainer(ctx context.Context, id string) error {
+	m.starts = append(m.starts, id)
+	return nil
+}
 
 func TestRunHooksAndBackup(t *testing.T) {
 	client := &mockDockerClient{}
@@ -37,6 +47,7 @@ func TestRunHooksAndBackup(t *testing.T) {
 			PreHook:     "echo pre1",
 			PostHook:    "echo post1",
 			Paths:       []string{"/path1"},
+			Stop:        true,
 		},
 		{
 			ContainerID: "c2",
@@ -61,6 +72,10 @@ func TestRunHooksAndBackup(t *testing.T) {
 	assert.Equal(t, execCall{"c2", []string{"sh", "-c", "echo pre2"}}, client.execs[1])
 	assert.Equal(t, execCall{"c1", []string{"sh", "-c", "echo post1"}}, client.execs[2])
 
+	// Check stop and start
+	assert.Equal(t, []string{"c1"}, client.stops)
+	assert.Equal(t, []string{"c1"}, client.starts)
+
 	// Check restic execution
 	assert.Equal(t, []string{"backup", "/path1", "/path2", "--tag", "test"}, executedArgs)
 }
@@ -73,6 +88,7 @@ func TestRunHooksAndBackup_ResticFailure(t *testing.T) {
 			PreHook:     "echo pre1",
 			PostHook:    "echo post1",
 			Paths:       []string{"/path1"},
+			Stop:        true,
 		},
 	}
 
@@ -87,4 +103,8 @@ func TestRunHooksAndBackup_ResticFailure(t *testing.T) {
 	assert.Len(t, client.execs, 2)
 	assert.Equal(t, execCall{"c1", []string{"sh", "-c", "echo pre1"}}, client.execs[0])
 	assert.Equal(t, execCall{"c1", []string{"sh", "-c", "echo post1"}}, client.execs[1])
+
+	// Check stop and start - should start even on failure
+	assert.Equal(t, []string{"c1"}, client.stops)
+	assert.Equal(t, []string{"c1"}, client.starts)
 }

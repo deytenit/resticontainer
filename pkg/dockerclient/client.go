@@ -13,6 +13,8 @@ type DockerClient interface {
 	ListContainers(ctx context.Context) ([]types.Container, error)
 	InspectContainer(ctx context.Context, id string) (types.ContainerJSON, error)
 	ExecCommand(ctx context.Context, containerID string, cmd []string) error
+	StopContainer(ctx context.Context, id string) error
+	StartContainer(ctx context.Context, id string) error
 }
 
 type DefaultClient struct {
@@ -52,4 +54,12 @@ func (c *DefaultClient) ExecCommand(ctx context.Context, containerID string, cmd
 	defer attach.Close()
 	_, _ = io.Copy(io.Discard, attach.Reader)
 	return nil
+}
+
+func (c *DefaultClient) StopContainer(ctx context.Context, id string) error {
+	return c.cli.ContainerStop(ctx, id, container.StopOptions{})
+}
+
+func (c *DefaultClient) StartContainer(ctx context.Context, id string) error {
+	return c.cli.ContainerStart(ctx, id, container.StartOptions{})
 }

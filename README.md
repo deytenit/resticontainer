@@ -17,6 +17,7 @@ To enable a container to be backed up by `resticontainer`, add the following lab
 - `restic.backup.paths=/data,/etc/config`: **(Required)** A comma-separated list of container paths to back up. *These must correspond to active bind mounts or named volumes.*
 - `restic.hooks.pre-backup`: *(Optional)* A command to run inside the container before the backup starts.
 - `restic.hooks.post-backup`: *(Optional)* A command to run inside the container after the backup finishes (runs even if the backup fails).
+- `restic.backup.stop=true`: *(Optional)* Automatically stops the container *after* running pre-hooks, performs the backup, and starts it again *before* running post-hooks. Great for ensuring database files (like SQLite) are cleanly flushed to disk. (You can also use `restic.backup.down=true`).
 
 ## Example: PostgreSQL Backup
 

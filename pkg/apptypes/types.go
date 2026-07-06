@@ -5,4 +5,5 @@ type Target struct {
 	PreHook     string
 	PostHook    string
 	Paths       []string
+	Stop        bool
 }
