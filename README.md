@@ -14,7 +14,7 @@ A lightweight wrapper around [Restic](https://restic.net/) that adds automatic d
 To enable a container to be backed up by `resticontainer`, add the following labels to your Docker container or Compose service:
 
 - `restic.enable=true`: **(Required)** Enables backup for this container.
-- `restic.backup.paths=/data,/etc/config`: **(Required)** A comma-separated list of container paths to back up. *These must correspond to active bind mounts or named volumes.*
+- `restic.backup.paths=/data,/etc/config`: **(Required)** A comma-separated list of container paths to back up. Each path must be an active bind mount / named volume **or a subdirectory of one** — so a single mount like `/data` can be backed up selectively (e.g. `restic.backup.paths=/data/library,/data/upload`, leaving regenerable siblings like `/data/thumbs` out). The most specific (longest-matching) mount is used to resolve the host path.
 - `restic.hooks.pre-backup`: *(Optional)* A command to run inside the container before the backup starts.
 - `restic.hooks.post-backup`: *(Optional)* A command to run inside the container after the backup finishes (runs even if the backup fails).
 - `restic.backup.stop=true`: *(Optional)* Automatically stops the container *after* running pre-hooks, performs the backup, and starts it again *before* running post-hooks. Great for ensuring database files (like SQLite) are cleanly flushed to disk. (You can also use `restic.backup.down=true`).

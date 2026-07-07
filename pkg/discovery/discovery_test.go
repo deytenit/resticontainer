@@ -50,6 +50,31 @@ func TestParseContainer(t *testing.T) {
 	assert.Equal(t, []string{"/hostfs/var/lib/docker/volumes/foo/_data", "/hostfs/host/etc/config"}, target.Paths)
 }
 
+func TestParseContainer_Subpaths(t *testing.T) {
+	cJSON := types.ContainerJSON{
+		ContainerJSONBase: &types.ContainerJSONBase{ID: "sub"},
+		Config: &container.Config{
+			Labels: map[string]string{
+				"restic.enable": "true",
+				// exact mount; a subdir of a mount; a subdir of the more-specific
+				// nested mount; a false-prefix (skipped); an unmounted path (skipped).
+				"restic.backup.paths": "/data,/data/library,/data/media/x,/database,/missing",
+			},
+		},
+		Mounts: []types.MountPoint{
+			{Destination: "/data", Source: "/host/data", Type: mount.TypeBind},
+			{Destination: "/data/media", Source: "/host/media", Type: mount.TypeBind},
+		},
+	}
+	target, err := ParseContainer(cJSON, "/hostfs")
+	assert.NoError(t, err)
+	assert.Equal(t, []string{
+		"/hostfs/host/data",         // /data (exact)
+		"/hostfs/host/data/library", // /data/library (subdir of /data)
+		"/hostfs/host/media/x",      // /data/media/x (subdir of the nested /data/media — longest match wins)
+	}, target.Paths)
+}
+
 func TestParseContainer_NotEnabled(t *testing.T) {
 	cJSON := types.ContainerJSON{
 		Config: &container.Config{
