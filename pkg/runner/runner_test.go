@@ -63,7 +63,7 @@ func TestRunHooksAndBackup(t *testing.T) {
 		return nil
 	}
 
-	err := RunHooksAndBackup(context.Background(), client, targets, []string{"--tag", "test"}, execRestic)
+	err := RunHooksAndBackup(context.Background(), client, targets, []string{"/path1", "/path2"}, []string{"--tag", "test"}, execRestic)
 	assert.NoError(t, err)
 	
 	// Check hooks
@@ -96,7 +96,7 @@ func TestRunHooksAndBackup_ResticFailure(t *testing.T) {
 		return fmt.Errorf("restic failed")
 	}
 
-	err := RunHooksAndBackup(context.Background(), client, targets, []string{}, execRestic)
+	err := RunHooksAndBackup(context.Background(), client, targets, []string{"/path1"}, []string{}, execRestic)
 	assert.ErrorContains(t, err, "restic backup failed: restic failed")
 	
 	// Check hooks - post hook should still run!

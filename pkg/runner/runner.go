@@ -9,7 +9,7 @@ import (
 
 type ResticExecutor func(ctx context.Context, args []string) error
 
-func RunHooksAndBackup(ctx context.Context, client dockerclient.DockerClient, targets []*apptypes.Target, resticArgs []string, execRestic ResticExecutor) error {
+func RunHooksAndBackup(ctx context.Context, client dockerclient.DockerClient, targets []*apptypes.Target, backupPaths []string, resticArgs []string, execRestic ResticExecutor) error {
 	var executedPreHooks []*apptypes.Target
 	var stoppedContainers []*apptypes.Target
 
@@ -51,11 +51,6 @@ func RunHooksAndBackup(ctx context.Context, client dockerclient.DockerClient, ta
 			}
 			stoppedContainers = append(stoppedContainers, t)
 		}
-	}
-
-	var backupPaths []string
-	for _, t := range targets {
-		backupPaths = append(backupPaths, t.Paths...)
 	}
 
 	if len(backupPaths) > 0 {

@@ -85,3 +85,28 @@ func TestParseContainer_NotEnabled(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Nil(t, target)
 }
+
+func TestParseContainer_LockLabelAndName(t *testing.T) {
+	cases := []struct {
+		name   string
+		labels map[string]string
+		want   bool
+	}{
+		{"absent defaults to true", map[string]string{"restic.enable": "true"}, true},
+		{"explicit true", map[string]string{"restic.enable": "true", "restic.backup.lock": "true"}, true},
+		{"explicit false disables", map[string]string{"restic.enable": "true", "restic.backup.lock": "false"}, false},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			cJSON := types.ContainerJSON{
+				ContainerJSONBase: &types.ContainerJSONBase{ID: "id", Name: "/myctr"},
+				Config:            &container.Config{Labels: tc.labels},
+			}
+			target, err := ParseContainer(cJSON, "/hostfs")
+			assert.NoError(t, err)
+			assert.NotNil(t, target)
+			assert.Equal(t, tc.want, target.Lock)
+			assert.Equal(t, "myctr", target.Name) // leading slash trimmed
+		})
+	}
+}
