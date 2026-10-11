@@ -2,6 +2,7 @@ package dockerclient
 
 import (
 	"context"
+	"fmt"
 	"io"
 
 	"github.com/docker/docker/api/types"
@@ -52,7 +53,19 @@ func (c *DefaultClient) ExecCommand(ctx context.Context, containerID string, cmd
 		return err
 	}
 	defer attach.Close()
-	_, _ = io.Copy(io.Discard, attach.Reader)
+	if _, err := io.Copy(io.Discard, attach.Reader); err != nil {
+		return fmt.Errorf("read exec output: %w", err)
+	}
+	inspect, err := c.cli.ContainerExecInspect(ctx, resp.ID)
+	if err != nil {
+		return fmt.Errorf("inspect exec: %w", err)
+	}
+	if inspect.Running {
+		return fmt.Errorf("exec %s is still running after its output stream closed", resp.ID)
+	}
+	if inspect.ExitCode != 0 {
+		return fmt.Errorf("exec %s failed with exit code %d", resp.ID, inspect.ExitCode)
+	}
 	return nil
 }
 
