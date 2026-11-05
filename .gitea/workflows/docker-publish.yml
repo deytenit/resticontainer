@@ -1,0 +1,68 @@
+name: Publish Docker Image
+'on':
+  push:
+    tags:
+    - v*.*.*
+  workflow_dispatch:
+    inputs:
+      restic_version:
+        description: Restic Version (e.g., 0.16.4)
+        required: true
+        default: latest
+env:
+  REGISTRY: git.ermnvldmr.com
+  IMAGE_NAME: ${{ github.repository }}
+jobs:
+  build-and-push:
+    runs-on: apex-debian13
+    permissions:
+      contents: read
+      packages: write
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+    - name: Determine Version Tags
+      id: version
+      run: "if [ \"${{ github.event_name }}\" = \"workflow_dispatch\" ]; then\n  VERSION=\"\
+        ${{ github.event.inputs.restic_version }}\"\nelse\n  # Strip 'v' prefix from\
+        \ tag\n  VERSION=\"${GITHUB_REF#refs/tags/v}\"\nfi\necho \"RESTIC_VERSION=$VERSION\"\
+        \ >> $GITHUB_OUTPUT\necho \"IMAGE_TAG=$VERSION\" >> $GITHUB_OUTPUT\n"
+    - name: Set up QEMU
+      run: test -r /proc/sys/fs/binfmt_misc/qemu-aarch64
+    - name: Set up Docker Buildx
+      run: 'docker buildx version
+
+        docker buildx create --name apex-ci --driver docker-container --use
+
+        docker buildx inspect --bootstrap'
+    - name: Log in to the Container registry
+      run: python3 .gitea/scripts/docker.py login
+      env:
+        REGISTRY: ${{ env.REGISTRY }}
+        REGISTRY_USER: ${{ github.repository_owner }}
+        REGISTRY_TOKEN: ${{ secrets.REGISTRY_TOKEN }}
+    - name: Extract metadata (tags, labels) for Docker
+      id: meta
+      run: python3 .gitea/scripts/docker.py metadata
+      env:
+        IMAGES: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+        TAG_RULES: 'type=raw,value=${{ steps.version.outputs.IMAGE_TAG }}
+
+          type=raw,value=latest
+
+          '
+        SOURCE_SHA: ${{ github.sha }}
+    - name: Build and push Docker image
+      run: python3 .gitea/scripts/docker.py build
+      env:
+        TAGS: ${{ steps.meta.outputs.tags }}
+        LABELS: ${{ steps.meta.outputs.labels }}
+        BUILD_ARGS: 'RESTIC_VERSION=${{ steps.version.outputs.RESTIC_VERSION }}
+
+          '
+        DOCKERFILE: ''
+        PLATFORMS: linux/amd64,linux/arm64
+        PUSH: 'true'
+        CONTEXT: .
+        SOURCE_SHA: ${{ github.sha }}
+        RUN_ID: ${{ github.run_id }}
